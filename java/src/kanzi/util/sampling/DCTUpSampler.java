@@ -34,8 +34,8 @@ public class DCTUpSampler implements UpSampler
    private final IntTransform idct;
    private final IntTransform fdct;
    private final int[] scan;    
-   private final int[] buffer1;
-   private final int[] buffer2;
+   private int[] buffer1;
+   private int[] buffer2;
    
    
    public DCTUpSampler(int width, int height)
@@ -45,6 +45,13 @@ public class DCTUpSampler implements UpSampler
  
     
    public DCTUpSampler(int width, int height, int stride, int offset, int step)
+   {
+      this(width, height, stride, offset, step, new int[0], new int[0]);
+   }
+   
+   
+   public DCTUpSampler(int width, int height, int stride, int offset, int step,
+      int[] buffer1, int[] buffer2)
    {
       if (offset < 0)
          throw new IllegalArgumentException("The offset must be at least 0");
@@ -94,8 +101,8 @@ public class DCTUpSampler implements UpSampler
       this.idct = idct_;
       this.scan = scan_;      
       this.dim = step;
-      this.buffer1 = new int[this.dim*this.dim];
-      this.buffer2 = new int[this.dim*this.dim];
+      this.buffer1 = buffer1;
+      this.buffer2 = buffer2;
    }
     
     
@@ -120,15 +127,21 @@ public class DCTUpSampler implements UpSampler
       final int h = this.height;
       final int w = this.width;
       final int st = this.stride;
+      final int count = this.dim * this.dim;
+      
+      if (this.buffer1.length < count)
+         this.buffer1 = new int[count];
+          
+      if (this.buffer2.length < count)
+         this.buffer2 = new int[count];
+      
       final int[] buf1 = this.buffer1;
       final int[] buf2 = this.buffer2;
-      final int count = this.dim * this.dim;
       final SliceIntArray src = new SliceIntArray(buf1, 0);
       final SliceIntArray dst = new SliceIntArray(buf2, 0);
       final int step = this.dim >> 1;
       final int stStep = st * step;
       final int count4 = count >> 2;
-      int[] map = new int[buf1.length];
       
       for (int y=0; y<h; y+=step)
       {
@@ -152,12 +165,12 @@ public class DCTUpSampler implements UpSampler
 
                iOffs += st;   
             }
-//process1(buf1, map);
+
             src.index = 0;
             dst.index = 0;
             src.length = count4;
             this.fdct.forward(src, dst);
-//process2(buf2, map);           
+          
             // Unpack and clear DCT high frequency bands (3/4 coefficients)
             for (int i=0; i<count; i+=4)
             {
@@ -194,35 +207,6 @@ public class DCTUpSampler implements UpSampler
       }    
    }
 
-   private void process1(int[] buf, int[] map)
-   {
-      for (int i=0; i<buf.length; i++)
-         map[i] = -1;
-      
-      int n = 0;
-         
-      for (int i=0; i<buf.length; i++)
-      {
-         if (map[buf[i]&0xFF] == -1)
-             map[buf[i]&0xFF] = n++;
-      }
-      
-      for (int i=0; i<buf.length; i++)
-      {
-         if (map[i] != -1)
-            buf[i] = map[i];
-      }
-   }
-
-   private void process2(int[] buf, int[] map)
-   {
-      for (int i=0; i<buf.length; i++)
-      {
-         if (map[i] != -1)
-            buf[i] = map[i];
-      }
-
-   }
 
    @Override
    public boolean supportsScalingFactor(int factor)

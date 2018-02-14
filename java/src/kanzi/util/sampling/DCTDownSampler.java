@@ -34,8 +34,8 @@ public class DCTDownSampler implements DownSampler
    private final IntTransform fdct;
    private final IntTransform idct;
    private final int[] scan;
-   private final int[] buffer1;
-   private final int[] buffer2;
+   private int[] buffer1;
+   private int[] buffer2;
 
    
    public DCTDownSampler(int w, int h)
@@ -45,6 +45,13 @@ public class DCTDownSampler implements DownSampler
    
    
    public DCTDownSampler(int width, int height, int stride, int offset, int step)
+   {
+      this(width, height, stride, offset, step, new int[0], new int[0]);      
+   }
+   
+   
+   public DCTDownSampler(int width, int height, int stride, int offset, int step,
+      int[] buffer1, int[] buffer2)
    {
       if (offset < 0)
          throw new IllegalArgumentException("The offset must be at least 0");
@@ -94,8 +101,8 @@ public class DCTDownSampler implements DownSampler
       this.idct = idct_;
       this.scan = scan_;
       this.dim = step;
-      this.buffer1 = new int[this.dim*this.dim];
-      this.buffer2 = new int[this.dim*this.dim];
+      this.buffer1 = buffer1;
+      this.buffer2 = buffer2;
    }
 
    
@@ -120,9 +127,16 @@ public class DCTDownSampler implements DownSampler
       final int h = this.height;
       final int w = this.width;
       final int st = this.stride;
+      final int count = this.dim * this.dim;
+      
+      if (this.buffer1.length < count)
+         this.buffer1 = new int[count];
+          
+      if (this.buffer2.length < count)
+         this.buffer2 = new int[count];
+      
       final int[] buf1 = this.buffer1;
       final int[] buf2 = this.buffer2;
-      final int count = this.dim * this.dim;
       final SliceIntArray src = new SliceIntArray(buf1, 0);
       final SliceIntArray dst = new SliceIntArray(buf2, 0);
       final int step = this.dim;
