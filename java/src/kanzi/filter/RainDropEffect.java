@@ -73,8 +73,8 @@ public class RainDropEffect implements IntFilter
       if ((amplitude128 < 0) || (amplitude128 > 128))
          throw new IllegalArgumentException("The amplitude must be [0..128]");
 
-      if ((phase1024 < 0) || (phase1024 > Global.PI_1024_MULT2))
-         throw new IllegalArgumentException("The phase must be [0.." + Global.PI_1024_MULT2 + "]");
+      if ((phase1024 < 0) || (phase1024 > (Global.PI_1024*2)))
+         throw new IllegalArgumentException("The phase must be [0.." + (Global.PI_1024*2) + "]");
 
       if (wavelength < 2)
          throw new IllegalArgumentException("The wavelengtht must be at least 2");
@@ -134,7 +134,7 @@ public class RainDropEffect implements IntFilter
            
            // Calculate displacement
            final int distance1024 = Global.sqrt(d2);
-           final int angle1024 = ((distance1024 / wl * Global.PI_1024_MULT2) >> 10) - phase1024;
+           final int angle1024 = ((distance1024 / wl * (Global.PI_1024*2)) >> 10) - phase1024;
            int amount1024 = (amplitude128 * Global.sin(angle1024)) >> 7;
            amount1024 = (amount1024 * (r1024 - distance1024)) / r1024;
            
@@ -225,7 +225,7 @@ public class RainDropEffect implements IntFilter
     // Not thread safe
     public boolean setPhase(int phase1024)
     {
-        if ((phase1024 < 0) || (phase1024 > Global.PI_1024_MULT2))
+        if ((phase1024 < 0) || (phase1024 > (Global.PI_1024*2)))
            return false;
 
         this.phase = phase1024;
