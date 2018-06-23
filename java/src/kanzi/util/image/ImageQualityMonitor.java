@@ -332,14 +332,14 @@ public final class ImageQualityMonitor
          scale += 2;
       }      
       
-      final int logScale = Global.ten_log10(1<<scale);
+      final int logScale = Global.tenLog10(1<<scale);
       
       // Formula:  double mse = (double) (sum) / size
       //           double psnr = 10 * Math.log10(255d*255d/mse);
       // or        double psnr = 10 * (Math.log10(65025) + (Math.log10(size) - Math.log10(sum))
       // Calculate PSNR << 10 with 1024 * 10 * (log10(65025L) = 49286
       // 1024*10*log10(100) = 20480
-      return 49286 + (Global.ten_log10(pixels) - Global.ten_log10((int) sum)) - logScale;      
+      return 49286 + (Global.tenLog10(pixels) - Global.tenLog10((int) sum)) - logScale;      
    }
 
    

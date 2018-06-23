@@ -73,7 +73,7 @@ public class TestRainDropEffect
             while (effect.getAmplitude() > 0)
             {
                 effect.setAmplitude(effect.getAmplitude()-1);
-                effect.setPhase((effect.getPhase()+500)%Global.PI_1024_MULT2);
+                effect.setPhase((effect.getPhase()+500)%(Global.PI_1024*2));
                 effect.apply(source, dest);
                 img2.getRaster().setDataElements(0, 0, w, h, dest.array);
                 frame2.invalidate();
