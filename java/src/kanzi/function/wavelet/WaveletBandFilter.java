@@ -16,7 +16,7 @@ limitations under the License.
 package kanzi.function.wavelet;
 
 import kanzi.SliceIntArray;
-import kanzi.IntFunction;
+import kanzi.IntTransform;
 
 
 // Quantize, reorder and comb the wavelet sub-band coefficients before entropy coding.
@@ -28,7 +28,7 @@ import kanzi.IntFunction;
 // The coefficients are reordered per sub-band (resolution scalability) but the
 // resulting bitstream (after entropy coding) is not embedded.
 // Not thread safe
-public class WaveletBandFilter implements IntFunction
+public class WaveletBandFilter implements IntTransform
 {
     private static final int IS_LEAF = 0x7F;
     private static final int MIN_NB_COEFFS_FOR_CLUSTER = 2;

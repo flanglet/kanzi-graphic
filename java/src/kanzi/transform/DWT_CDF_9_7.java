@@ -23,322 +23,329 @@ import kanzi.IntTransform;
 // Fast integer based implementation using the lifting scheme.
 public class DWT_CDF_9_7 implements IntTransform
 {
-    private static final int SHIFT1  = 12;
-    private static final int ADJUST1 = 1 << (SHIFT1 - 1);
-    private static final int SHIFT2  = SHIFT1 - 1;
-    private static final int ADJUST2 = 1 << (SHIFT2 - 1);
+   private static final int SHIFT1  = 12;
+   private static final int ADJUST1 = 1 << (SHIFT1 - 1);
+   private static final int SHIFT2  = SHIFT1 - 1;
+   private static final int ADJUST2 = 1 << (SHIFT2 - 1);
 
-    private static final int PREDICT1 = 6497; // 1.586134342  * 1<<SHIFT1
-    private static final int UPDATE1  = 217;  // 0.0529801185 * 1<<SHIFT1
-    private static final int PREDICT2 = 3616; // 0.8829110762 * 1<<SHIFT1
-    private static final int UPDATE2  = 1817; // 0.4435068522 * 1<<SHIFT1
-    private static final int SCALING1 = 4709; // 1.149604398  * 1<<SHIFT1
-    private static final int SCALING2 = 3563; // 0.869864452  * 1<<SHIFT1
+   private static final int PREDICT1 = 6497; // 1.586134342  * 1<<SHIFT1
+   private static final int UPDATE1  = 217;  // 0.0529801185 * 1<<SHIFT1
+   private static final int PREDICT2 = 3616; // 0.8829110762 * 1<<SHIFT1
+   private static final int UPDATE2  = 1817; // 0.4435068522 * 1<<SHIFT1
+   private static final int SCALING1 = 4709; // 1.149604398  * 1<<SHIFT1
+   private static final int SCALING2 = 3563; // 0.869864452  * 1<<SHIFT1
 
-    private final int[] data;
-    private final int width;
-    private final int height;
-    private final int steps;
-
-
-    // dim (dimension of the whole image)
-    public DWT_CDF_9_7(int dim)
-    {
-       this(dim, dim, 5);
-    }
+   private final int[] data;
+   private final int width;
+   private final int height;
+   private final int steps;
 
 
-    public DWT_CDF_9_7(int width, int height)
-    {
-       this(width, height, 5);
-    }
+   // dim (dimension of the whole image)
+   public DWT_CDF_9_7(int dim)
+   {
+      this(dim, dim, 5);
+   }
 
 
-    public DWT_CDF_9_7(int width, int height, int steps)
-    {
-        if (width < 8)
-            throw new IllegalArgumentException("Invalid transform width (must"
-                    + " be at least 8)");
-
-        if (height < 8)
-            throw new IllegalArgumentException("Invalid transform width (must"
-                    + " be at least 8)");
-
-        if (steps < 1)
-            throw new IllegalArgumentException("Invalid number of iterations "
-                    + "(must be at least 1)");
-
-        if ((width >> steps) < 4)
-            throw new IllegalArgumentException("Invalid width for band L0 (must"
-                    + " be at least 4)");
-
-        if ((height >> steps) < 4)
-            throw new IllegalArgumentException("Invalid height for band L0 (must"
-                    + " be at least 4)");
-
-        if (((width >> steps) << steps) != width)
-            throw new IllegalArgumentException("Invalid parameters: change width or number of steps ("
-                    + width + " divided by 2^" + steps + " is not an integer value)");
-
-        if (((height >> steps) << steps) != height)
-            throw new IllegalArgumentException("Invalid parameters: change height or number of steps ("
-                    + height + " divided by 2^" + steps + " is not an integer value)");
-
-        this.width = width;
-        this.height = height;
-        this.steps = steps;
-        this.data = new int[width*height];
-    }
+   public DWT_CDF_9_7(int width, int height)
+   {
+      this(width, height, 5);
+   }
 
 
-    public int getWidth()
-    {
-        return this.width;
-    }
+   public DWT_CDF_9_7(int width, int height, int steps)
+   {
+       if (width < 8)
+           throw new IllegalArgumentException("Invalid transform width (must"
+                   + " be at least 8)");
+
+       if (height < 8)
+           throw new IllegalArgumentException("Invalid transform width (must"
+                   + " be at least 8)");
+
+       if (steps < 1)
+           throw new IllegalArgumentException("Invalid number of iterations "
+                   + "(must be at least 1)");
+
+       if ((width >> steps) < 4)
+           throw new IllegalArgumentException("Invalid width for band L0 (must"
+                   + " be at least 4)");
+
+       if ((height >> steps) < 4)
+           throw new IllegalArgumentException("Invalid height for band L0 (must"
+                   + " be at least 4)");
+
+       if (((width >> steps) << steps) != width)
+           throw new IllegalArgumentException("Invalid parameters: change width or number of steps ("
+                   + width + " divided by 2^" + steps + " is not an integer value)");
+
+       if (((height >> steps) << steps) != height)
+           throw new IllegalArgumentException("Invalid parameters: change height or number of steps ("
+                   + height + " divided by 2^" + steps + " is not an integer value)");
+
+       this.width = width;
+       this.height = height;
+       this.steps = steps;
+       this.data = new int[width*height];
+   }
 
 
-    public int getHeight()
-    {
-        return this.height;
-    }
+   public int getWidth()
+   {
+       return this.width;
+   }
 
 
-    public int getLevels()
-    {
-        return this.steps;
-    }
+   public int getHeight()
+   {
+       return this.height;
+   }
 
 
-    // Calculate the forward discrete wavelet transform of the 2D input signal
-    // Not thread safe because this.data is modified
-    @Override
-    public boolean forward(SliceIntArray src, SliceIntArray dst)
-    {
-        if ((!SliceIntArray.isValid(src)) || (!SliceIntArray.isValid(dst)))
-           return false;
-        
-        final int count = this.width * this.height;              
-        
-        if (src.length != count)
-           return false;
-       
-        if (dst.length < count)
-           return false;      
-       
-        if (dst.index + count > dst.array.length)
-           return false;   
-              
-        if ((src.array != dst.array) || (src.index != dst.index))
-        {
-           System.arraycopy(src.array, src.index, dst.array, dst.index, count);
-        }
-
-        for (int i=0; i<this.steps; i++)
-        {
-           // First, vertical transform
-           this.forward(dst.array, dst.index, this.width, 1, this.width>>i, this.height>>i);
-
-           // Then horizontal transform on the updated signal
-           this.forward(dst.array, dst.index, 1, this.width, this.height>>i, this.width>>i);
-        }
-
-        src.index += count;
-        dst.index += count;
-        return true;
-    }
+   public int getLevels()
+   {
+       return this.steps;
+   }
 
 
-    private void forward(int[] block, int blkptr, int stride, int inc, int dim1, int dim2)
-    {
-        final int stride2 = stride << 1;
-        final int endOffs = blkptr + (dim1 * inc);
-        final int half = stride * (dim2 >> 1);
+   // Calculate the forward discrete wavelet transform of the 2D input signal
+   // Not thread safe because this.data is modified
+   @Override
+   public boolean forward(SliceIntArray src, SliceIntArray dst)
+   {
+       if ((!SliceIntArray.isValid(src)) || (!SliceIntArray.isValid(dst)))
+          return false;
 
-        for (int offset=blkptr; offset<endOffs; offset+=inc)
-        {
-            final int end = offset + (dim2 - 2) * stride;
-            int prev = block[offset];
+       final int count = this.width * this.height;        
 
-            // First lifting stage : Predict 1
-            for (int i=offset+stride; i<end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] -= ((PREDICT1 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+       if (src.length != count)
+          return false;
 
-            block[end+stride] -= ((PREDICT1 * block[end] + ADJUST2) >> SHIFT2);
-            prev = block[offset+stride];
+       if (dst.length < count)
+          return false;
 
-            // Second lifting stage : Update 1
-            for (int i=offset+stride2; i<=end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] -= ((UPDATE1 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+       if (dst.index + count > dst.array.length)
+          return false;
 
-            block[offset] -= ((UPDATE1 * block[offset+stride] + ADJUST2) >> SHIFT2);
-            prev = block[offset];
+       if ((src.array != dst.array) || (src.index != dst.index))
+       {
+          System.arraycopy(src.array, src.index, dst.array, dst.index, count);
+       }
 
-            // Third lifting stage : Predict 2
-            for (int i=offset+stride; i<end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] += ((PREDICT2 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+       for (int i=0; i<this.steps; i++)
+       {
+          // First, vertical transform
+          this.forward(dst.array, dst.index, this.width, 1, this.width>>i, this.height>>i);
 
-            block[end+stride] += ((PREDICT2 * block[end] + ADJUST2) >> SHIFT2);
-            prev = block[offset+stride];
+          // Then horizontal transform on the updated signal
+          this.forward(dst.array, dst.index, 1, this.width, this.height>>i, this.width>>i);
+       }
 
-            // Fourth lifting stage : Update 2
-            for (int i=offset+stride2; i<=end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] += ((UPDATE2 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
-
-            block[offset] += ((UPDATE2 * block[offset+stride] + ADJUST2) >> SHIFT2);
-
-            // Scale
-            for (int i=offset; i<=end; i+=stride2)
-            {
-                block[i] = (block[i] * SCALING1 + ADJUST1) >> SHIFT1;
-                block[i+stride] = (block[i+stride] * SCALING2 + ADJUST1) >> SHIFT1;
-            }
-
-            // De-interleave sub-bands
-            final int endj = offset + half;
-
-            for (int i=offset, j=offset; j<endj; i+=stride2, j+=stride)
-            {
-                this.data[j] = block[i];
-                this.data[half+j] = block[i+stride];
-            }
-
-            block[end+stride] = this.data[end+stride];
-
-            for (int i=offset; i<=end; i+=stride)
-                block[i] = this.data[i];
-        }
-    }
-    
-
-    // Calculate the reverse discrete wavelet transform of the 2D input signal
-    // Not thread safe because this.data is modified
-    @Override
-    public boolean inverse(SliceIntArray src, SliceIntArray dst)
-    {
-        if ((!SliceIntArray.isValid(src)) || (!SliceIntArray.isValid(dst)))
-           return false;
-        
-        final int count = this.width * this.height;       
-        
-        if (src.length != count)
-           return false;
-       
-        if (dst.length < count)
-           return false;
-       
-        if (dst.index + count > dst.array.length)
-           return false;          
-       
-        if ((src.array != dst.array) || (src.index != dst.index))
-        {
-           System.arraycopy(src.array, src.index, dst.array, dst.index, count);
-        }
-
-        for (int i=this.steps-1; i>=0; i--)
-        {
-           // First horizontal transform
-           this.inverse(dst.array, dst.index, 1, this.width, this.height>>i, this.width>>i);
-
-           // Then vertical transform on the updated signal
-           this.inverse(dst.array, dst.index, this.width, 1, this.width>>i, this.height>>i);
-        }
-
-        src.index += count;
-        dst.index += count;
-        return true;
-    }
+       src.index += count;
+       dst.index += count;
+       return true;
+   }
 
 
-    private void inverse(int[] block, int blkptr, int stride, int inc, int dim1, int dim2)
-    {
-        final int stride2 = stride << 1;
-        final int endOffs = blkptr + (dim1 * inc);
-        final int half = stride * (dim2 >> 1);
+   private void forward(int[] block, int blkptr, int stride, int inc, int dim1, int dim2)
+   {
+       final int stride2 = stride << 1;
+       final int endOffs = blkptr + (dim1 * inc);
+       final int half = stride * (dim2 >> 1);
 
-        for (int offset=blkptr; offset<endOffs; offset+=inc)
-        {
-            final int end = offset + (dim2 - 2) * stride;
-            final int endj = offset + half;
+       for (int offset=blkptr; offset<endOffs; offset+=inc)
+       {
+           final int end = offset + (dim2 - 2) * stride;
+           int prev = block[offset];
 
-            // De-interleave sub-bands
-            for (int i=offset; i<=end; i+=stride)
-                this.data[i] = block[i];
+           // First lifting stage : Predict 1
+           for (int i=offset+stride; i<end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] -= ((PREDICT1 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
 
-            this.data[end+stride] = block[end+stride];
+           block[end+stride] -= ((PREDICT1 * block[end] + ADJUST2) >> SHIFT2);
+           prev = block[offset+stride];
 
-            for (int i=offset, j=offset; j<endj; i+=stride2, j+=stride)
-            {
-                block[i] = this.data[j];
-                block[i+stride] = this.data[half+j];
-            }
+           // Second lifting stage : Update 1
+           for (int i=offset+stride2; i<=end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] -= ((UPDATE1 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
 
-            // Reverse scale
-            for (int i=offset; i<=end; i+=stride2)
-            {
-                block[i] = (block[i] * SCALING2 + ADJUST1) >> SHIFT1;
-                block[i+stride] = (block[i+stride] * SCALING1 + ADJUST1) >> SHIFT1;
-            }
+           block[offset] -= ((UPDATE1 * block[offset+stride] + ADJUST2) >> SHIFT2);
+           prev = block[offset];
 
-            // Reverse Update 2
-            int prev = block[offset+stride];
+           // Third lifting stage : Predict 2
+           for (int i=offset+stride; i<end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] += ((PREDICT2 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
 
-            for (int i=offset+stride2; i<=end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] -= ((UPDATE2 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+           block[end+stride] += ((PREDICT2 * block[end] + ADJUST2) >> SHIFT2);
+           prev = block[offset+stride];
 
-            block[offset] -= ((UPDATE2 * block[offset+stride] + ADJUST2) >> SHIFT2);
-            prev = block[offset];
+           // Fourth lifting stage : Update 2
+           for (int i=offset+stride2; i<=end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] += ((UPDATE2 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
 
-            // Reverse Predict 2
-            for (int i=offset+stride; i<end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] -= ((PREDICT2 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+           block[offset] += ((UPDATE2 * block[offset+stride] + ADJUST2) >> SHIFT2);
 
-            block[end+stride] -= ((PREDICT2 * block[end] + ADJUST2) >> SHIFT2);
-            prev = block[offset+stride];
+           // Scale
+           for (int i=offset; i<=end; i+=stride2)
+           {
+               block[i] = (block[i] * SCALING1 + ADJUST1) >> SHIFT1;
+               block[i+stride] = (block[i+stride] * SCALING2 + ADJUST1) >> SHIFT1;
+           }
 
-            // Reverse Update 1
-            for (int i=offset+stride2; i<=end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] += ((UPDATE1 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+           // De-interleave sub-bands
+           final int endj = offset + half;
 
-            block[offset] += ((UPDATE1 * block[offset+stride] + ADJUST2) >> SHIFT2);
-            prev = block[offset];
+           for (int i=offset, j=offset; j<endj; i+=stride2, j+=stride)
+           {
+               this.data[j] = block[i];
+               this.data[half+j] = block[i+stride];
+           }
 
-            // Reverse Predict 1
-            for (int i=offset+stride; i<end; i+=stride2)
-            {
-                final int next = block[i+stride];
-                block[i] += ((PREDICT1 * (prev + next) + ADJUST1) >> SHIFT1);
-                prev = next;
-            }
+           block[end+stride] = this.data[end+stride];
 
-            block[end+stride] += ((PREDICT1 * block[end] + ADJUST2) >> SHIFT2);
-        }
-    }
+           for (int i=offset; i<=end; i+=stride)
+               block[i] = this.data[i];
+       }
+   }
+
+
+   // Calculate the reverse discrete wavelet transform of the 2D input signal
+   // Not thread safe because this.data is modified
+   @Override
+   public boolean inverse(SliceIntArray src, SliceIntArray dst)
+   {
+       if ((!SliceIntArray.isValid(src)) || (!SliceIntArray.isValid(dst)))
+          return false;
+
+       final int count = this.width * this.height;
+
+       if (src.length != count)
+          return false;
+
+       if (dst.length < count)
+          return false;
+
+       if (dst.index + count > dst.array.length)
+          return false;
+
+       if ((src.array != dst.array) || (src.index != dst.index))
+       {
+          System.arraycopy(src.array, src.index, dst.array, dst.index, count);
+       }
+
+       for (int i=this.steps-1; i>=0; i--)
+       {
+          // First horizontal transform
+          this.inverse(dst.array, dst.index, 1, this.width, this.height>>i, this.width>>i);
+
+          // Then vertical transform on the updated signal
+          this.inverse(dst.array, dst.index, this.width, 1, this.width>>i, this.height>>i);
+       }
+
+       src.index += count;
+       dst.index += count;
+       return true;
+   }
+
+
+   private void inverse(int[] block, int blkptr, int stride, int inc, int dim1, int dim2)
+   {
+       final int stride2 = stride << 1;
+       final int endOffs = blkptr + (dim1 * inc);
+       final int half = stride * (dim2 >> 1);
+
+       for (int offset=blkptr; offset<endOffs; offset+=inc)
+       {
+           final int end = offset + (dim2 - 2) * stride;
+           final int endj = offset + half;
+
+           // De-interleave sub-bands
+           for (int i=offset; i<=end; i+=stride)
+               this.data[i] = block[i];
+
+           this.data[end+stride] = block[end+stride];
+
+           for (int i=offset, j=offset; j<endj; i+=stride2, j+=stride)
+           {
+               block[i] = this.data[j];
+               block[i+stride] = this.data[half+j];
+           }
+
+           // Reverse scale
+           for (int i=offset; i<=end; i+=stride2)
+           {
+               block[i] = (block[i] * SCALING2 + ADJUST1) >> SHIFT1;
+               block[i+stride] = (block[i+stride] * SCALING1 + ADJUST1) >> SHIFT1;
+           }
+
+           // Reverse Update 2
+           int prev = block[offset+stride];
+
+           for (int i=offset+stride2; i<=end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] -= ((UPDATE2 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
+
+           block[offset] -= ((UPDATE2 * block[offset+stride] + ADJUST2) >> SHIFT2);
+           prev = block[offset];
+
+           // Reverse Predict 2
+           for (int i=offset+stride; i<end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] -= ((PREDICT2 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
+
+           block[end+stride] -= ((PREDICT2 * block[end] + ADJUST2) >> SHIFT2);
+           prev = block[offset+stride];
+
+           // Reverse Update 1
+           for (int i=offset+stride2; i<=end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] += ((UPDATE1 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
+
+           block[offset] += ((UPDATE1 * block[offset+stride] + ADJUST2) >> SHIFT2);
+           prev = block[offset];
+
+           // Reverse Predict 1
+           for (int i=offset+stride; i<end; i+=stride2)
+           {
+               final int next = block[i+stride];
+               block[i] += ((PREDICT1 * (prev + next) + ADJUST1) >> SHIFT1);
+               prev = next;
+           }
+
+           block[end+stride] += ((PREDICT1 * block[end] + ADJUST2) >> SHIFT2);
+       }
+   }
+
+
+   @Override
+   public int getMaxEncodedLength(int srcLen)
+   {
+      return srcLen;
+   }
 }

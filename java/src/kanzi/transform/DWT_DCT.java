@@ -140,4 +140,11 @@ public class DWT_DCT implements IntTransform
      
       return this.dwt.inverse(src, dst);
    }
+
+
+   @Override
+   public int getMaxEncodedLength(int srcLen)
+   {
+      return srcLen;
+   }
 }

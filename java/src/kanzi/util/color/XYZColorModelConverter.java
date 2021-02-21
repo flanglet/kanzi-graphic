@@ -18,7 +18,7 @@ package kanzi.util.color;
 import kanzi.ColorModelType;
 
 
-// Fat color model converter RGB <-> CIE 1931 XYZ
+// Fast color model converter RGB <-> CIE 1931 XYZ
 public final class XYZColorModelConverter implements ColorModelConverter
 {
     private final int height;

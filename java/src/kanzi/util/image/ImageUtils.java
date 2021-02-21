@@ -396,7 +396,7 @@ public class ImageUtils
       return data;
    }  
    
-   
+
    // Expand to new dw x dh dimensions by duplicating last row / last column
    public byte[] pad(byte[] data, int dw, int dh)
    {

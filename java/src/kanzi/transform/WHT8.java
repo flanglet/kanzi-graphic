@@ -199,4 +199,10 @@ public final class WHT8 implements IntTransform
        return compute(src, dst, this.data, this.iScale);
     }
 
+
+   @Override
+   public int getMaxEncodedLength(int srcLen)
+   {
+      return srcLen;
+   }
 }

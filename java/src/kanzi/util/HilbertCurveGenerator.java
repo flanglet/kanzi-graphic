@@ -45,7 +45,7 @@ public class HilbertCurveGenerator
 
         data[0] = 0;
         Context ctx = new Context(data, 1, 0);
-        this.generate(level, Direction.LEFT, ctx);
+        this.generate(level, Direction.UP, ctx);
         return data;
     }
 
@@ -175,4 +175,15 @@ public class HilbertCurveGenerator
         }
     }
 
+
+   public static void main(String[] args)
+   {
+      int[] data = new int[1024];
+      int dim = 8;
+      new HilbertCurveGenerator(dim).generate(data);
+
+      for (int i=0; i<dim*dim; i++)
+         System.out.println(data[i]);
+
+   }
 }
